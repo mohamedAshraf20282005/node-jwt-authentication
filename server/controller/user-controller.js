@@ -4,6 +4,8 @@ const statusText = require("../utils/statusText");
 
 const generateToken = require('../jwt/generateToken');
 
+const bcrypt = require('bcryptjs');
+
 
 
 const getAllUsers = async (req, res) => {
@@ -32,19 +34,24 @@ const register = async (req,res) => {
         const {userName, email, password} = req.body;
         const user= await userModel.findOne({email:email});
 
-        // if(user){
-        //    return res.status(400).json('This user is found');
+        // check if user is found
+        if(user){
+           return res.status(400).json('This user is found');
             
-        // }
+        }
+        // hashing to password
+        const hashedPassword = await bcrypt.hash(password,10);
 
+        // create new User
         const newUser = userModel({
             userName,
             email,
-            password,
+            password: hashedPassword,
         })
+
         const token = await generateToken({userName,email});
+
         await newUser.save();
-        console.log(token);
         return res.status(201).json({statusText:statusText.SUCCESS,data:newUser, token:token});
     }catch(err){
         res.status(500).json(err);
