@@ -5,7 +5,7 @@ const router = express.Router();
 
 const {getAllUsers, getUser, register, login} = require('../controller/user-controller');
 
-router.get('/getAllUsers',getAllUsers,register);
+router.get('/getAllUsers',getAllUsers);
 
 router.get('/getUser',getUser);
 
