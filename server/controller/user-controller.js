@@ -6,79 +6,78 @@ const generateToken = require("../jwt/generateToken");
 
 const bcrypt = require("bcryptjs");
 
-const { registerValidation } = require("../validation/user-validation");
-
-const getAllUsers = async (req, res) => {
-  try {
-    const users = await userModel.find();
-    res.status(200).json({ statusText: statusText.SUCCESS, data: users });
-  } catch (err) {
-    res.status(500).json(err);
-  }
-};
-
-const getUser = async (req, res) => {
-  try {
-    const { userName, email, password } = req.body;
-    const user = await userModel.findOne({ userName: userName });
-    res.status(200).json({ statusText: statusText.SUCCESS, data: user });
-  } catch (err) {
-    res.status(500).json(err);
-  }
-};
+const dataValidation = require("../validation/user-validation");
 
 const register = async (req, res) => {
-  const userValidation = registerValidation.safeParse(req.body);
+  const inputValidation = dataValidation.safeParse(req.body);
 
-  if (userValidation.success) {
-    try {
-      const { userName, email, password } = req.body;
-      const user = await userModel.findOne({ email: email });
+  if (!inputValidation.success)
+    return res.status(404).send("this input is invalid");
 
-      // check if user is found
-      if (user) {
-        return res.status(400).json("This user is found");
-      }
-      // hashing to password
-      const hashedPassword = await bcrypt.hash(password, 10);
+  try {
+    const { userName, email, password } = req.body;
+    const user = await userModel.findOne({ $or: [{ userName }, { email }] });
 
-      // create new User
-      const newUser = userModel({
-        userName,
-        email,
-        password: hashedPassword,
-      });
-
-      const token = await generateToken({ userName, email });
-
-      await newUser.save();
-      return res
-        .status(201)
-        .json({ statusText: statusText.SUCCESS, data: newUser, token: token });
-    } catch (err) {
-      return res.status(500).json(err);
+    console.log(user);
+    if (user) {
+      if (user.userName == userName) {
+        return res.send("user name is invalid");
+      } else if (user.email == email) return res.send("email is invalid");
     }
-  } else {
-    res.status(404).send("this input is invalid");
+    // hashing to password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // create new User
+    const newUser = userModel({
+      userName,
+      email,
+      password: hashedPassword,
+    });
+
+    const token = await generateToken({ userName, email });
+    const { password: _, __v, ...safeData } = newUser.toObject();
+
+    await newUser.save();
+
+    return res.status(201).json({
+      statusText: statusText.SUCCESS,
+      data: safeData,
+      token: token,
+    });
+  } catch (err) {
+    return res.status(500).json(err);
   }
 };
 
 const login = async (req, res) => {
+  const inputValidation = dataValidation.safeParse(req.body);
+
+  if (!inputValidation.success)
+    return res.status(404).send("this input is invalid");
+
   try {
-    const { email, password } = req.body;
-    const user = await userModel.findOne({ email: email });
+    const { userName, email, password } = req.body;
+    const user = await userModel.findOne({ $or: [{ email }, { userName }] });
 
     if (!user) return res.status(404).json("email or password is wrong");
 
-    return res.status(200).json("Login Successfuly");
+    const matchedPassword = await bcrypt.compare(password, user.password);
+
+    if (!matchedPassword) return res.send("email or password is wrong");
+
+    const { password: _, __v, ...safeData } = user.toObject();
+
+    const token = await generateToken({ userName, email });
+
+    return res
+      .status(200)
+      .json({ statusText: statusText.SUCCESS, data: safeData, token });
   } catch (err) {
     return res.status(500).json(err);
   }
 };
 
 module.exports = {
-  getAllUsers,
-  getUser,
   register,
   login,
 };

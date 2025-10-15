@@ -1,11 +1,10 @@
 const {object,string} = require('zod');
 
-const registerValidation = object({
+const dataValidation = object({
     userName:string(),
     email:string().email(),
     password:string().min(8)
 })
 
-module.exports = {
-    registerValidation
-}
+module.exports = dataValidation
+
